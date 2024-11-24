@@ -1,3 +1,4 @@
+
 ////////////////////////////////////////////////////////////////////////
 //** ENGR-2350 Lab 4 Template
 //** NAME: Xiomara Pelaez Cuacua
@@ -19,6 +20,7 @@
 //** timing. The variable runControl is set to 1 each period and then reset in the main.
 
 #include "engr2350_msp432.h"
+
 
 void GPIOInit();
 void TimerInit();
@@ -44,7 +46,7 @@ float desired_speed_left, diff_speed_left, min_diff_speed_left, max_diff_speed_l
 
 float desired_speed_right, diff_speed_right, min_diff_speed_right, max_diff_speed_right, speed_error_right, speed_error_rightsum, correct_speed_right, compare_value_right, m, right_speed;
 
-float heading_error, desired_heading =0, measured_heading;
+float heading_error, desired_heading =0, measured_heading, previous_error, compass_speed;
 uint8_t hand[1];
 uint8_t on_car[1];
 uint8_t hand_compass[2];
@@ -76,9 +78,11 @@ int main( void ) {    /** Main Function ****/
 
     GPIO_setOutputHighOnPin(GPIO_PORT_P3,GPIO_PIN6|GPIO_PIN7);
     GPIO_setOutputLowOnPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
+    printf("Lab 5 Part a \r\n");
 
    // Loop until both compasses report being calibrated:
     while(on_car[0] != 3){
+        printf("calibrating compass");
         //I2C_readData(EUSCI_B3_BASE,0x63,30,hand,0);
         I2C_readData(EUSCI_B3_BASE,0x60,30,on_car,1);
 //        if(hand==3){
@@ -94,13 +98,13 @@ int main( void ) {    /** Main Function ****/
     while( 1 ) {
         if(runControl){    // If 100 ms has passed
             runControl = 0;    // Reset the 100 ms flag
-            // Control routine: Explicitly follow pseudocode from Lab document
 
             //read all necessary values from compass
             printf("starting to read compass data \r\n");
             //I2C_readData(EUSCI_B3_BASE,0x63,2,hand_compass,2);
             I2C_readData(EUSCI_B3_BASE,0x60,2,on_carcompass,2);
-
+            max_diff_speed_left = (desired_speed_left*0.5)*(149/(2*0.200));
+            compass_speed=on_carcompass[0];
 //            <-- Start Heading Control -->
 //                      Calculate the heading error and "wrap" the error to -180 to 180 (or -1800 to 1800)
             //            heading error = desired_heading - measured_heading
@@ -110,15 +114,21 @@ int main( void ) {    /** Main Function ****/
             }else if (heading_error < -180) {
                 heading_error+=360;
             }
-//                      Calculate the differential speed using the PD control (equation given above)
-//                      Enforce maximumum limit on differential speed
-//                      Store the current heading error as previous heading error (for derivative control)
-//                      <-- End Heading Control -->
-//                      <-- Start Speed Control -->
-//                      Calculate the desired speed from the compass tilt value
-//                      <-- End Speed Control -->
-//                      <-- Wheel Speed Control from Lab4 -->
-//
+//          Calculate the differential speed using the PD control (equation given above)
+            diff_speed_left=desired_speed_left- compass_speed;
+            diff_speed_right=desired_speed_right  + compass_speed;
+//            Enforce maximumum limit on differential speed
+            if(diff_speed_left > (.2*max_diff_speed_left)) {
+                compass_speed = max_diff_speed_left;
+            }
+//            Store the current heading error as previous heading error (for derivative control)
+            previous_error = heading_error;
+//            <-- End Heading Control -->
+//            <-- Start Speed Control -->
+//            Calculate the desired speed from the compass tilt value
+//            <-- End Speed Control -->
+//            <-- Wheel Speed Control from Lab4 -->
+
 
 
 
@@ -377,7 +387,7 @@ void TimerInit(){
     TA2cfg.clockSource = TIMER_A_CLOCKSOURCE_SMCLK;
     TA2cfg.clockSourceDivider = TIMER_A_CLOCKSOURCE_DIVIDER_64;
     TA2cfg.timerInterruptEnable_TAIE = TIMER_A_TAIE_INTERRUPT_ENABLE;
-    TA2cfg.timerPeriod = 37499;
+    TA2cfg.timerPeriod = 18749;
     Timer_A_configureUpMode(TIMER_A2_BASE,&TA2cfg);
     Timer_A_registerInterrupt(TIMER_A2_BASE,TIMER_A_CCRX_AND_OVERFLOW_INTERRUPT,T2_100ms_ISR);
 
@@ -438,3 +448,5 @@ void T2_100ms_ISR(){
     Timer_A_clearInterruptFlag(TIMER_A2_BASE);
     runControl = 1;
 }
+
+
