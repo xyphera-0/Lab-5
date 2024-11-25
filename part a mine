@@ -28,6 +28,8 @@ void ADCInit();
 void Encoder_ISR();
 void T2_100ms_ISR();
 void I2CInit();
+uint16_t readCompass();
+
 
 Timer_A_UpModeConfig TA0cfg; // PWM timer
 Timer_A_UpModeConfig TA2cfg; // 100 ms timer
@@ -48,9 +50,11 @@ float desired_speed_right, diff_speed_right, min_diff_speed_right, max_diff_spee
 
 float heading_error, desired_heading =0, measured_heading, previous_error, compass_speed;
 uint8_t hand[1];
-uint8_t on_car[1];
+uint8_t on_car[2];
 uint8_t hand_compass[2];
 uint8_t on_carcompass[2];
+uint8_t compass[2];
+uint16_t compassHeading;
 
 
 
@@ -80,15 +84,22 @@ int main( void ) {    /** Main Function ****/
     GPIO_setOutputLowOnPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
     printf("Lab 5 Part a \r\n");
 
+    readCompass();
+    printf("after read compass");
    // Loop until both compasses report being calibrated:
-    while(on_car[0] != 3){
-        printf("calibrating compass");
+    while(on_car[0]&0x03 != 0x07){
+        printf("calibrating compass\r\n");
         //I2C_readData(EUSCI_B3_BASE,0x63,30,hand,0);
-        I2C_readData(EUSCI_B3_BASE,0x60,30,on_car,1);
+        I2C_readData(EUSCI_B3_BASE,0x60,30,on_car,2);
+        printf("on_car[0]:::: %u \r\n", on_car[0]&0x03);
+        //printf("on_car[1]:::: %u \r\n", on_car[1]);
+
+        printf("after read");
 //        if(hand==3){
 //            GPIO_setOutputHighOnPin(GPIO_PORT_P2,GPIO_PIN0);
 //        }
-        if(on_car[0] ==3){
+        if(on_car[0]&0x03 == 0x07){
+            printf("compass has been calibrate");
             GPIO_setOutputHighOnPin(GPIO_PORT_P1,GPIO_PIN0);
         }
     }
@@ -323,9 +334,12 @@ void GPIOInit(){
 //    GPIO_setAsInputPin(GPIO_PORT_P4,GPIO_PIN1|GPIO_PIN4); //4.4 left (speed), 4.1 to right(steering)
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN4, GPIO_TERTIARY_MODULE_FUNCTION); //4.4 left (speed)
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN1, GPIO_TERTIARY_MODULE_FUNCTION); //4.1 to right (steering)
-    //led
-    GPIO_setAsOutputPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
+
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN6, GPIO_SECONDARY_MODULE_FUNCTION);
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN7, GPIO_SECONDARY_MODULE_FUNCTION);
+
     GPIO_setOutputLowOnPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P1,GPIO_PIN0);
 }
 
 void I2CInit(){
@@ -449,4 +463,14 @@ void T2_100ms_ISR(){
     runControl = 1;
 }
 
+uint16_t readCompass(){
+//    Ensure a minimum 2-element uint8_t array exists
+//    use I2C_readData to fetch registers 2 and 3 at the same time
+    printf("starting to read compass data \r\n");
+    I2C_readData(EUSCI_B3_BASE,0x60,2,compass,2);
+//    Combine the received bytes together to form the heading value
+      compassHeading = (compass[0]<<8) + (compass[1]) ;
+      //printf("compassheading: %u \r\n", compassHeading);
+      return compassHeading;
+}
 
