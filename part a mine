@@ -79,7 +79,7 @@ int main( void ) {    /** Main Function ****/
     __delay_cycles(24e6);
 
     GPIO_setOutputHighOnPin(GPIO_PORT_P3,GPIO_PIN6|GPIO_PIN7);
-    GPIO_setOutputLowOnPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
+    GPIO_setOutputHighOnPin(GPIO_PORT_P1,GPIO_PIN0);
     printf("Lab 5 Part a \r\n");
 
 //    readCompass();
@@ -106,6 +106,7 @@ int main( void ) {    /** Main Function ****/
         }
 
 
+
     printf("Lab 5 Part a \r\n");
     while( 1 ) {
         if(runControl){    // If 100 ms has passed
@@ -117,6 +118,7 @@ int main( void ) {    /** Main Function ****/
             max_diff_speed_left = (desired_speed_left*0.5)*(149/(2*0.200));
             compass_speed=on_carcompass[0];
             measured_heading= on_carcompass[0];
+            printf("measured: %f \r\n", measured_heading);
 //            <-- Start Heading Control -->
             heading_error = desired_heading - measured_heading;
             if (heading_error > 180) {
@@ -308,6 +310,7 @@ void GPIOInit(){
     GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN7, GPIO_SECONDARY_MODULE_FUNCTION);
 
     GPIO_setOutputLowOnPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
+    GPIO_setAsOutputPin(GPIO_PORT_P1,GPIO_PIN0);
     GPIO_setOutputLowOnPin(GPIO_PORT_P1,GPIO_PIN0);
 }
 
