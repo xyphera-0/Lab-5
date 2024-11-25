@@ -79,7 +79,7 @@ int main( void ) {    /** Main Function ****/
     __delay_cycles(24e6);
 
     GPIO_setOutputHighOnPin(GPIO_PORT_P3,GPIO_PIN6|GPIO_PIN7);
-    GPIO_setOutputHighOnPin(GPIO_PORT_P1,GPIO_PIN0);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P1,GPIO_PIN0);
     printf("Lab 5 Part a \r\n");
 
 //    readCompass();
@@ -114,7 +114,9 @@ int main( void ) {    /** Main Function ****/
 
             printf("starting to read compass data \r\n");
             //I2C_readData(EUSCI_B3_BASE,0x63,2,hand_compass,2);
-            I2C_readData(EUSCI_B3_BASE,0x60,2,on_carcompass,2);
+            //I2C_readData(EUSCI_B3_BASE,0x60,2,on_carcompass,2);
+            readCompass();
+            printf("Compass: %4u\r\n",compassHeading);
             max_diff_speed_left = (desired_speed_left*0.5)*(149/(2*0.200));
             compass_speed=on_carcompass[0];
             measured_heading= on_carcompass[0];
@@ -433,4 +435,15 @@ void Encoder_ISR(){
 void T2_100ms_ISR(){
     Timer_A_clearInterruptFlag(TIMER_A2_BASE);
     runControl = 1;
+}
+
+uint16_t readCompass(){
+//    Ensure a minimum 2-element uint8_t array exists
+//    use I2C_readData to fetch registers 2 and 3 at the same time
+    printf("starting to read compass data \r\n");
+    I2C_readData(EUSCI_B3_BASE,0x60,2,compass,2);
+//    Combine the received bytes together to form the heading value
+      compassHeading = (compass[0]<<8) + (compass[1]) ;
+      //printf("compassheading: %u \r\n", compassHeading);
+      return compassHeading;
 }
