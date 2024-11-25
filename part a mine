@@ -1,7 +1,7 @@
 
 ////////////////////////////////////////////////////////////////////////
 //** ENGR-2350 Lab 4 Template
-//** NAME: Xiomara Pelaez Cuacua & Gizelle Ojeda-Ericsken
+//** NAME: Xiomara Pelaez Cuacua & Gizelle ojeda-Ericksen
 //** RIN: 662068537 & 662065015
 ////////////////////////////////////////////////////////////////////////
 //**
@@ -85,23 +85,25 @@ int main( void ) {    /** Main Function ****/
 //    readCompass();
 //    printf("after read compass");
    // Loop until both compasses report being calibrated:
-    while(on_car[0]&0x03 == 0x07){
-        printf("calibrating compass\r\n");
-        //I2C_readData(EUSCI_B3_BASE,0x63,30,hand,0);
-        I2C_readData(EUSCI_B3_BASE,0x60,30,on_car,2);
-        printf("on_car[0]:::: %u \r\n", on_car[0]&0x03);
-        //printf("on_car[1]:::: %u \r\n", on_car[1]);
-
-        printf("after read");
-        if(on_car[0]&0x03 == 0x07){
-            printf("compass has been calibrate");
-            GPIO_setOutputHighOnPin(GPIO_PORT_P1,GPIO_PIN0);
-            break;
+    while(1){
+            printf("calibrating compass\r\n");
+    //        I2C_readData(EUSCI_B3_BASE, 0x63, 30, hand, 1);
+            I2C_readData(EUSCI_B3_BASE, 0x60, 30, on_car, 2);
+            printf("on_car[0]:::: %u \r\n", on_car[0]&0x03);
+            if((on_car[0]&0x03) == (0x07&0x03)){
+                printf("compass has been calibrate\r\n");
+                GPIO_setOutputHighOnPin(GPIO_PORT_P1, GPIO_PIN0);
+                break;
+            } else {
+                GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN0);
+            }
+            printf("after read\r\n");
+    //        if(hand[0]& 0x03 == 0x07){
+    //            GPIO_setOutputHighOnPin(GPIO_PORT_P2, GPIO_PIN0);
+    //        }else {
+    //            GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN0);
+    //        }
         }
-//        if(hand==3){
-//            GPIO_setOutputHighOnPin(GPIO_PORT_P2,GPIO_PIN0);
-//        }
-    }
 
 
     printf("Lab 5 Part a \r\n");
