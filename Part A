@@ -1,5 +1,3 @@
-
-
 ////////////////////////////////////////////////////////////////////////
 //** ENGR-2350 Lab 4 Template
 //** NAME: Xiomara Pelaez Cuacua
@@ -24,9 +22,21 @@
 
 void GPIOInit();
 void TimerInit();
-void ADCInit();
 void Encoder_ISR();
 void T2_100ms_ISR();
+void I2CInit();
+uint16_t readCompass();
+
+eUSCI_I2C_MasterConfig i2c;
+uint8_t compass[2];
+uint8_t calibration;
+uint16_t compassHeading;
+
+float heading_error, desired_heading =0, measured_heading;
+uint8_t hand[1];
+uint8_t on_car[1];
+uint8_t hand_compass[2];
+uint8_t on_carcompass[2];
 
 Timer_A_UpModeConfig TA0cfg; // PWM timer
 Timer_A_UpModeConfig TA2cfg; // 100 ms timer
@@ -40,86 +50,82 @@ float ki = .0001; // integral control gain
 float speed_val; //   speed  // ADC value from potetiometer (left)
 float dir_val, direct_val;   // steering // ADC value from potetiometer (right)
 float desired_speed_left, diff_speed_left, min_diff_speed_left, max_diff_speed_left, speed_error_left, speed_error_leftsum,correct_speed_left, compare_value_left, m, left_speed;
-
 float desired_speed_right, diff_speed_right, min_diff_speed_right, max_diff_speed_right, speed_error_right, speed_error_rightsum, correct_speed_right, compare_value_right, m, right_speed;
-
 
 // Encoder total events
 uint32_t enc_total_L,enc_total_R;
-// Speed measurement variables
+
 // Note that "Tach" stands for "Tachometer," or a device used to measure rotational speed
 int32_t TachL_count, TachL, TachL_sum, TachL_sum_count, TachL_avg; // Left wheel
 int32_t TachR_count, TachR, TachR_sum, TachR_sum_count, TachR_avg; // Right wheel
-    // TachL,TachR are equivalent to enc_counts from Activity 10/Lab 3
-    // TachL/R_avg is the averaged TachL/R value after every 12 encoder measurements
-    // The rest are the intermediate variables used to assemble TachL/R_avg
 
 uint8_t runControl = 0; // Flag to denote that 100ms has passed and control should be run.
 
 int main( void ) {    /** Main Function ****/
     SysInit();
     GPIOInit();
-    ADCInit();
     TimerInit();
-
-   // ADC14_toggleConversionTrigger();
+    I2CInit();
 
     __delay_cycles(24e6);
 
     GPIO_setOutputHighOnPin(GPIO_PORT_P3,GPIO_PIN6|GPIO_PIN7);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P1,GPIO_PIN0);
 
-    printf("Lab 4 Part a \r\n");
+    while(1){
+        I2C_readData(EUSCI_B3_BASE, 0x63, 30, hand, 1);
+        I2C_readData(EUSCI_B3_BASE, 0x60, 30, on_car, 1);
+        if(on_car[0] == 3){
+            GPIO_setOutputHighOnPin(GPIO_PORT_P1, GPIO_PIN0);
+        } else {
+            GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN0);
+        }
+        if(hand[0]== 3){
+            GPIO_setOutputHighOnPin(GPIO_PORT_P2, GPIO_PIN0);
+        }else {
+            GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN0);
+        }
+
+    printf("Lab 5 Part a \r\n");
     while( 1 ) {
-        if(runControl){    // If 100 ms has passed
-            runControl = 0;    // Reset the 100 ms flag
+        if(runControl){    // If 50 ms has passed
+            runControl = 0;    // Reset the 50 ms flag
             // Control routine: Explicitly follow pseudocode from Lab document
+            readCompass();
+
+//            <-- Start Heading Control -->
+            heading_error = desired_heading - comapssHeading; //hand-held compass - on-car compass
+            if(heading_error > 180){
+                heading_error -= 360;
+            }else if(heading_error < -180){
+                heading_error += 360;
+            }
+//            Calculate the differential speed using the PD control (equation given above)
+            
+
+//            <-- End Heading Control -->
 
                 //Trigger the ADC to read both potentiometers
-                //ADC14_enableConversion();
                 m=(500-100)/(.9*8192);
                 speed_val = ADC14_getResult(ADC_MEM0);
                 dir_val = ADC14_getResult(ADC_MEM1);
                 ADC14_toggleConversionTrigger();
 
-                //Convert the speed potentiometer measurement to a desired speed
-                //desired_speed_left = 16384*((3.3 - 0.0)/(speed_val - 0.0));
-
-                //desired_speed_left = 16384*((speed_val - 0.0)/(3.3 - 0.0));
-
-                desired_speed_left = speed_val;
-                desired_speed_right = speed_val;
-                direct_val=dir_val;
-                printf("direct_val: %f\r\n", direct_val);
-                printf("desired speed: %f \r\n", speed_val);
-//              for left wheel
-                //speed
-              //  printf("begin desired speed:::::::: %f\r\n", desired_speed_left);
-               // printf("SPEED VAL:::::: %f\r\n", speed_val);
-                //Ensure the desired speed follows the control specifications below
-                //Convert the steering potentiometer measurement to a differential speed following the specifications below.
+                desired_speed_left = 0;
+                desired_speed_right = 0;
+                direct_val = dir_val;
+                //for left wheel
                 diff_speed_left = desired_speed_left*((0.5*149)/(149/2));
-               // printf("begin diff speed: %f\r\n", diff_speed_left);
 
                 min_diff_speed_left = .1*65535;
-               // printf("min_diff_speed: %f\r\n", min_diff_speed_left);
-                max_diff_speed_left = (desired_speed_left*0.5)*(149/(2*0.200));
-              //  printf("max diff speed: %f\r\n", max_diff_speed_left);
+                max_diff_speed_left = (desired_speed_left*0.5)*(149/(2*0.200));\
 
                 //for right wheel
-                //speed
-                //printf("begin desired speed:::::::: %f\r\n", desired_speed_right);
-              // printf("SPEED VAL:::::: %f\r\n", speed_val);
-               //Ensure the desired speed follows the control specifications below
-              // direc_val_right=16384*((3.3 - 0.0)/(dir_val - 0.0 ));
-               //printf("begin direction value: %f\r\n", direc_val_right);
-               //Convert the steering potentiometer measurement to a differential speed following the specifications below.
                diff_speed_right = desired_speed_right*((0.5*149)/(149/2));
-              // printf("begin diff speed: %f\r\n", diff_speed_right);
 
                min_diff_speed_right = .1*65535;
-             //  printf("min_diff_speed: %f\r\n", min_diff_speed_right);
                max_diff_speed_right = (desired_speed_right*0.5)*(149/(2*0.200));
-              // printf("max diff speed: %f\r\n", max_diff_speed_right);
 
                 //<-- Start Wheel Speed Control -->
                 //For Each Wheel: left
@@ -279,22 +285,9 @@ int main( void ) {    /** Main Function ****/
         }
     }
     }
-
-
-
-void ADCInit(){
-    // Add your ADC initialization code here.
-    //  Don't forget the GPIO, either here or in GPIOInit()!!
-    ADC14_enableModule();
-    ADC14_initModule(ADC_CLOCKSOURCE_SMCLK,ADC_PREDIVIDER_4 ,ADC_DIVIDER_1 , ADC_NOROUTE);
-    ADC14_setResolution(ADC_14BIT);
-    ADC14_configureConversionMemory(ADC_MEM0, ADC_VREFPOS_AVCC_VREFNEG_VSS, ADC_INPUT_A9, false); //4.4
-    ADC14_configureConversionMemory(ADC_MEM1, ADC_VREFPOS_AVCC_VREFNEG_VSS, ADC_INPUT_A12, false); //4.1
-    //ADC14_configureSingleSampleMode(ADC_MEM0, false);
-    ADC14_configureMultiSequenceMode(ADC_MEM0, ADC_MEM1, true);
-    ADC14_enableSampleTimer(ADC_AUTOMATIC_ITERATION);
-    ADC14_enableConversion();
 }
+
+
 
 void GPIOInit(){
     GPIO_setAsOutputPin(GPIO_PORT_P5,GPIO_PIN4|GPIO_PIN5);   // Motor direction pins
@@ -306,11 +299,31 @@ void GPIOInit(){
 
     GPIO_setOutputLowOnPin(GPIO_PORT_P5,GPIO_PIN4|GPIO_PIN5);   // Motors set to forward
     GPIO_setOutputHighOnPin(GPIO_PORT_P3,GPIO_PIN6|GPIO_PIN7);   // Motors are OFF
-        //potentiometer
-//    GPIO_setAsInputPin(GPIO_PORT_P4,GPIO_PIN1|GPIO_PIN4); //4.4 left (speed), 4.1 to right(steering)
-    GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN4, GPIO_TERTIARY_MODULE_FUNCTION); //4.4 left (speed)
-    GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN1, GPIO_TERTIARY_MODULE_FUNCTION); //4.1 to right (steering)
 
+    //Heading Pins
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN6, GPIO_SECONDARY_MODULE_FUNCTION);
+    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN7, GPIO_SECONDARY_MODULE_FUNCTION);
+
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P1,GPIO_PIN0);
+
+}
+void I2CInit(){
+    i2c.selectClockSource = EUSCI_B_I2C_CLOCKSOURCE_SMCLK;
+    i2c.i2cClk = 24000000;
+    i2c.dataRate = EUSCI_B_I2C_SET_DATA_RATE_100KBPS;
+    i2c.byteCounterThreshold = 0;
+    i2c.autoSTOPGeneration = EUSCI_B_I2C_NO_AUTO_STOP;
+
+    I2C_initMaster(EUSCI_B3_BASE , &i2c);
+    I2C_enableModule(EUSCI_B3_BASE);
+}
+
+uint16_t readCompass(){
+    printf("starting to read compass data \r\n");
+    I2C_readData(EUSCI_B3_BASE,0x60,2,compass,2);
+    compassHeading = (compass[0]<<8) + (compass[1]) ;
+    return compassHeading;
 }
 
 void TimerInit(){
@@ -362,7 +375,7 @@ void TimerInit(){
     TA2cfg.clockSource = TIMER_A_CLOCKSOURCE_SMCLK;
     TA2cfg.clockSourceDivider = TIMER_A_CLOCKSOURCE_DIVIDER_64;
     TA2cfg.timerInterruptEnable_TAIE = TIMER_A_TAIE_INTERRUPT_ENABLE;
-    TA2cfg.timerPeriod = 37499;
+    TA2cfg.timerPeriod = 18749;
     Timer_A_configureUpMode(TIMER_A2_BASE,&TA2cfg);
     Timer_A_registerInterrupt(TIMER_A2_BASE,TIMER_A_CCRX_AND_OVERFLOW_INTERRUPT,T2_100ms_ISR);
 
