@@ -1,4 +1,3 @@
-
 ////////////////////////////////////////////////////////////////////////
 //** ENGR-2350 Lab 4 Template
 //** NAME: Xiomara Pelaez Cuacua & Gizelle ojeda-Ericksen
@@ -119,7 +118,7 @@ int main( void ) {    /** Main Function ****/
             printf("Compass: %4u\r\n",compassHeading);
             max_diff_speed_left = (desired_speed_left*0.5)*(149/(2*0.200));
             compass_speed=on_carcompass[0];
-            measured_heading= on_carcompass[0];
+            measured_heading= compassHeading;
             printf("measured: %f \r\n", measured_heading);
 //            <-- Start Heading Control -->
             heading_error = desired_heading - measured_heading;
