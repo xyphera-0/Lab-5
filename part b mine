@@ -1,4 +1,3 @@
-
 ////////////////////////////////////////////////////////////////////////
 //** ENGR-2350 Lab 4 Template
 //** NAME: Xiomara Pelaez Cuacua & Gizelle ojeda-Ericksen
@@ -64,9 +63,6 @@ uint32_t enc_total_L,enc_total_R;
 // Note that "Tach" stands for "Tachometer," or a device used to measure rotational speed
 int32_t TachL_count, TachL, TachL_sum, TachL_sum_count, TachL_avg; // Left wheel
 int32_t TachR_count, TachR, TachR_sum, TachR_sum_count, TachR_avg; // Right wheel
-    // TachL,TachR are equivalent to enc_counts from Activity 10/Lab 3
-    // TachL/R_avg is the averaged TachL/R value after every 12 encoder measurements
-    // The rest are the intermediate variables used to assemble TachL/R_avg
 
 uint8_t runControl = 0; // Flag to denote that 100ms has passed and control should be run.
 
@@ -447,12 +443,12 @@ void T2_100ms_ISR(){
 }
 
 uint16_t readCompass(){
+    
 //    Ensure a minimum 2-element uint8_t array exists
 //    use I2C_readData to fetch registers 2 and 3 at the same time
     printf("starting to read compass data \r\n");
     I2C_readData(EUSCI_B3_BASE,0x60,2,compass,2);
 //    Combine the received bytes together to form the heading value
-      compassHeading = (compass[0]<<8) + (compass[1]) ;
-      //printf("compassheading: %u \r\n", compassHeading);
-      return compassHeading;
+    compassHeading = (compass[0]<<8) + (compass[1]) ;
+    return compassHeading;
 }
