@@ -73,8 +73,8 @@ uint8_t runControl = 0; // Flag to denote that 100ms has passed and control shou
 int main( void ) {    /** Main Function ****/
     SysInit();
     GPIOInit();
-    TimerInit();
     I2CInit();
+    TimerInit();
 
 
     __delay_cycles(24e6);
@@ -89,8 +89,8 @@ int main( void ) {    /** Main Function ****/
     while(1){
             printf("calibrating compass\r\n");
             I2C_readData(EUSCI_B3_BASE, 0x60, 30, on_car, 2);
-//            I2C_readData(EUSCI_B3_BASE, 0x63, 30, hand, 2);
-
+           // I2C_readData(EUSCI_B3_BASE, 0x63, 30, hand, 2);
+            //readCompass();
             printf("on_car[0]:::: %u \r\n", on_car[0]&0x03);
             if((on_car[0]&0x03) == (0x07&0x03)){
                 printf("on car compass has been calibrate\r\n");
@@ -99,17 +99,17 @@ int main( void ) {    /** Main Function ****/
             } else {
                 GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN0);
             }
-//            if((hand[0]&0x03) == (0x07&0x03)){
-//                printf("on hand compass has been calibrate\r\n");
-//                GPIO_setOutputHighOnPin(GPIO_PORT_P2, GPIO_PIN0);
-//            }else {
-//                GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN0);
-//            }
-//            if(((on_car[0]&0x03) == (0x07&0x03)) && ((hand[0]&0x03) == (0x07&0x03))) {
-//                printf("leaving loop\r\n");
-//
-//                break;
-//            }
+            if((hand[0]&0x03) == (0x07&0x03)){
+                printf("on hand compass has been calibrate\r\n");
+                GPIO_setOutputHighOnPin(GPIO_PORT_P2, GPIO_PIN0);
+            }else {
+                GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN0);
+            }
+            if(((on_car[0]&0x03) == (0x07&0x03)) && ((hand[0]&0x03) == (0x07&0x03))) {
+                printf("leaving loop\r\n");
+
+                break;
+            }
         }
 
 
@@ -317,9 +317,6 @@ void GPIOInit(){
 
     GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN6, GPIO_SECONDARY_MODULE_FUNCTION);
     GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN7, GPIO_SECONDARY_MODULE_FUNCTION);
-
-    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN6, GPIO_PRIMARY_MODULE_FUNCTION);
-    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN7, GPIO_PRIMARY_MODULE_FUNCTION);
 
     GPIO_setAsOutputPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
     GPIO_setOutputLowOnPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
