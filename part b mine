@@ -120,8 +120,8 @@ int main( void ) {    /** Main Function ****/
             runControl = 0;    // Reset the 100 ms flag
 
             printf("starting to read compass data \r\n");
-            //I2C_readData(EUSCI_B3_BASE,0x63,2,hand_compass,2);
-            //I2C_readData(EUSCI_B3_BASE,0x60,2,on_carcompass,2);
+            I2C_readData(EUSCI_B3_BASE,0x63,2,hand_compass,2);
+            I2C_readData(EUSCI_B3_BASE,0x60,2,on_carcompass,2);
             readCompass();
             printf("Compass: %4u\r\n",compassHeading);
             max_diff_speed_left = (desired_speed_left*0.5)*(149/(2*0.200));
