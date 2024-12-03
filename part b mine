@@ -43,21 +43,26 @@ eUSCI_I2C_MasterConfig I2c;
 eUSCI_I2C_MasterConfig I2c2;
 
 float ki = .0001; // integral control gain
+float kp = -0.5;
+float kd =1;
 float speed_val; //   speed  // ADC value from potetiometer (left)
 float dir_val, direct_val;   // steering // ADC value from potetiometer (right)
 float desired_speed_left, diff_speed_left, min_diff_speed_left, max_diff_speed_left, speed_error_left, speed_error_leftsum,correct_speed_left, compare_value_left, m, left_speed;
 
 float desired_speed_right, diff_speed_right, min_diff_speed_right, max_diff_speed_right, speed_error_right, speed_error_rightsum, correct_speed_right, compare_value_right, m, right_speed;
-
-float heading_error, desired_heading =0, measured_heading, previous_error, compass_speed;
+float max_diff_speed;
+float heading_error, desired_heading, measured_heading, previous_error, compass_speed, handcomHeading;
+;
 uint8_t hand[2];
 uint8_t on_car[2];
 uint8_t hand_compass[2];
 uint8_t on_carcompass[2];
 uint8_t compass[2];
 uint8_t handcompass[2];
+uint8_t handHeading[2];
 uint16_t compassHeading;
 uint16_t compassSpeed;
+int8_t negative;
 
 
 
@@ -120,27 +125,29 @@ int main( void ) {    /** Main Function ****/
     while( 1 ) {
         if(runControl){    // If 100 ms has passed
             runControl = 0;    // Reset the 100 ms flag
-
             printf("starting to read compass data \r\n");
             I2C_readData(EUSCI_B3_BASE,0x63,4,hand_compass,2);
             I2C_readData(EUSCI_B3_BASE,0x60,2,on_carcompass,2);
             readonCarCompass();
             readHandCompass();
+            desired_heading = handcomHeading;
             printf("Compass on car: %4u\r\n",compassHeading);
-            printf("Compass on hand: %4u\r\n",compassSpeed);
-            max_diff_speed_left = (desired_speed_left*0.5)*(149/(2*0.200));
+            printf("Compass on hand heading: %f\r\n",handcomHeading);
+            printf("Compass on hand: %4u\r\n",handcompass[0]);
+            printf("pitch value: %4u\r\n",handcompass[0]);
             compass_speed=hand_compass[0];
             measured_heading= compassHeading;
             printf("measured: %f \r\n", measured_heading);
 //            <-- Start Heading Control -->
             heading_error = desired_heading - measured_heading;
-            if (heading_error > 180) {
-                heading_error-=360;
-            }else if (heading_error < -180) {
-                heading_error+=360;
+            if (heading_error > 1800) {
+                heading_error-=3600;
+            }else if (heading_error < -1800) {
+                heading_error+=3600;
             }
-            diff_speed_left=desired_speed_left- compass_speed;
-            diff_speed_right=desired_speed_right  + compass_speed;
+            max_diff_speed = (kp*heading_error)+kd*(heading_error-(heading_error-1));
+            diff_speed_left=desired_speed_left- max_diff_speed;
+            diff_speed_right=desired_speed_right  + max_diff_speed;
             if(diff_speed_left > (.2*max_diff_speed_left)) {
                 compass_speed = max_diff_speed_left;
             }
@@ -153,8 +160,16 @@ int main( void ) {    /** Main Function ****/
 
 //            <-- End Speed Control -->
 //            <-- Wheel Speed Control from Lab4 -->
-            if(measured_heading == 0) {
-                if(compass_speed > 0){
+            if(measured_heading ==  desired_heading) {
+                if(compass_speed >127){
+                    negative= compass_speed-225;
+                    printf("negative: %u\r\n", negative);
+                }else if(compass_speed < 127 ){
+                    negative=compass_speed;
+                    printf("negative: %u\r\n", negative);
+                }
+                if(negative > 0){
+                    printf("stright\r\n");
                     GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN4);
                     GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN5);
                     desired_speed_left=(m)*left_speed+200.0;
@@ -162,7 +177,8 @@ int main( void ) {    /** Main Function ****/
                     Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, desired_speed_left);
                    Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right);
                 }
-                if(compass_speed < 0 ){
+                if(negative < 0){
+                    printf("backwards\r\n");
                     GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN4);
                     GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN5);
                     desired_speed_left = ((-1)*(m))*(8192-(1.1*8192))+200.0;
@@ -340,8 +356,9 @@ uint16_t readonCarCompass(){
 }
 uint16_t readHandCompass(){
     printf("starting to read hand compass data \r\n");
-    I2C_readData(EUSCI_B3_BASE,0x63,4,handcompass,2);
-    compassSpeed = (handcompass[0]<<8) + (handcompass[1]) ;
-    return compassSpeed;
+//    I2C_readData(EUSCI_B3_BASE,0x63,4,handcompass,2);
+    I2C_readData(EUSCI_B3_BASE,0x63,2,handHeading,2);
+    handcomHeading = (handHeading[0]<<8) + (handHeading[1]) ;
+    return handcomHeading;
 }
 
