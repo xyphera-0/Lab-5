@@ -1,8 +1,8 @@
 
 ////////////////////////////////////////////////////////////////////////
 //** ENGR-2350 Lab 4 Template
-//** NAME: Xiomara Pelaez Cuacua & Gizelle ojeda-Ericksen
-//** RIN: 662068537 & 662065015
+//** NAME: Xiomara Pelaez Cuacua
+//** RIN: 662068537
 ////////////////////////////////////////////////////////////////////////
 //**
 //** README!!!!!
@@ -21,15 +21,11 @@
 
 #include "engr2350_msp432.h"
 
-
 void GPIOInit();
 void TimerInit();
+void ADCInit();
 void Encoder_ISR();
 void T2_100ms_ISR();
-void I2CInit();
-uint16_t readonCarCompass();
-uint16_t readHandCompass();
-
 
 Timer_A_UpModeConfig TA0cfg; // PWM timer
 Timer_A_UpModeConfig TA2cfg; // 100 ms timer
@@ -39,29 +35,12 @@ Timer_A_CompareModeConfig TA0_ccr4; // PWM Left
 Timer_A_CaptureModeConfig TA3_ccr0; // Encoder Right
 Timer_A_CaptureModeConfig TA3_ccr1; // Encoder Left
 
-eUSCI_I2C_MasterConfig I2c;
-eUSCI_I2C_MasterConfig I2c2;
-
 float ki = .0001; // integral control gain
-float kp = -0.5;
-float kd =1;
-float desired_speed_left, diff_speed_left, max_diff_speed_left, left_speed;
+float speed_val; //   speed  // ADC value from potetiometer (left)
+float dir_val, direct_val;   // steering // ADC value from potetiometer (right)
+float desired_speed_left, diff_speed_left, min_diff_speed_left, max_diff_speed_left, speed_error_left, speed_error_leftsum,correct_speed_left, compare_value_left, m, left_speed;
 
-float desired_speed_right, diff_speed_right, max_diff_speed_right, right_speed;
-float max_diff_speed;
-float heading_error, desired_heading, measured_heading, previous_error, compass_speed, handcomHeading;
-
-uint8_t hand[2];
-uint8_t on_car[2];
-uint8_t hand_compass[2];
-uint8_t on_carcompass[2];
-uint8_t compass[2];
-uint8_t handcompass[2];
-uint8_t handHeading[2];
-uint16_t compassHeading;
-uint16_t compassSpeed;
-int8_t negative;
-
+float desired_speed_right, diff_speed_right, min_diff_speed_right, max_diff_speed_right, speed_error_right, speed_error_rightsum, correct_speed_right, compare_value_right, m, right_speed;
 
 
 // Encoder total events
@@ -79,125 +58,241 @@ uint8_t runControl = 0; // Flag to denote that 100ms has passed and control shou
 int main( void ) {    /** Main Function ****/
     SysInit();
     GPIOInit();
-    I2CInit();
+    ADCInit();
     TimerInit();
 
+   // ADC14_toggleConversionTrigger();
 
     __delay_cycles(24e6);
 
     GPIO_setOutputHighOnPin(GPIO_PORT_P3,GPIO_PIN6|GPIO_PIN7);
-    GPIO_setOutputLowOnPin(GPIO_PORT_P1,GPIO_PIN0);
-    printf("Lab 5 Part a \r\n");
 
-//    readCompass();
-//    printf("after read compass");
-   // Loop until both compasses report being calibrated:
-    while(1){
-            printf("calibrating compass\r\n");
-            I2C_readData(EUSCI_B3_BASE, 0x60, 30, on_car, 2);
-            I2C_readData(EUSCI_B3_BASE, 0x63, 30, hand, 2);
-            printf("on_car[0]:::: %u \r\n", on_car[0]&0x03);
-            printf("on_hand[0]:::: %u \r\n", hand[0]&0x03);
-            if((on_car[0]&0x03) == (0x07&0x03)){
-                printf("on car compass has been calibrate\r\n");
-                GPIO_setOutputHighOnPin(GPIO_PORT_P1, GPIO_PIN0);
-            } else {
-                GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN0);
-            }
-            if((hand[0]&0x03) == (0x07&0x03)){
-                printf("on hand compass has been calibrate\r\n");
-                GPIO_setOutputHighOnPin(GPIO_PORT_P2, GPIO_PIN0);
-            }else {
-                GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN0);
-            }
-            if(((on_car[0]&0x03) == (0x07&0x03)) && ((hand[0]&0x03) == (0x07&0x03))) {
-                printf("leaving loop\r\n");
-
-                break;
-            }
-        }
-
-
-
-    printf("Lab 5 Part a \r\n");
+    printf("Lab 4 Part a \r\n");
     while( 1 ) {
         if(runControl){    // If 100 ms has passed
             runControl = 0;    // Reset the 100 ms flag
-            printf("starting to read compass data \r\n");
-            I2C_readData(EUSCI_B3_BASE,0x63,4,hand_compass,2);
-            I2C_readData(EUSCI_B3_BASE,0x60,2,on_carcompass,2);
-            readonCarCompass();
-            readHandCompass();
-            desired_heading = handcomHeading;
-            printf("Compass on car: %4u\r\n",compassHeading);
-            printf("Compass on hand heading: %f\r\n",handcomHeading);
-            printf("Compass on hand: %4u\r\n",handcompass[0]);
-            printf("pitch value: %4u\r\n",handcompass[0]);
-            compass_speed=hand_compass[0];
-            measured_heading= compassHeading;
-            printf("measured: %f \r\n", measured_heading);
-            
-            ////////////// Calculate desired speed in DC with limits as well.
-            if(compass_speed >127){
-                                negative= compass_speed-256;
-                                printf("negative: %u\r\n", negative);
-                            }else if(compass_speed < 127 ){
-                                negative=compass_speed;
-                                printf("negative: %u\r\n", negative);
-                            }
-            /// finish this...
-            
-//            <-- Start Heading Control -->
-            heading_error = desired_heading - measured_heading;
-            if (heading_error > 1800) {
-                heading_error-=3600;
-            }else if (heading_error < -1800) {
-                heading_error+=3600;
-            }
-            max_diff_speed = (kp*heading_error)+kd*(heading_error-(previous_error));
-            ///////////////// Limit |diff speed| to 10-50 % DC
-            
-            speed_left=desired_speed- max_diff_speed;
-            speed_right=desired_speed  + max_diff_speed;
-           
-            previous_error = heading_error;
-//            <-- End Heading Control -->
-//            <-- Start Speed Control -->
+            // Control routine: Explicitly follow pseudocode from Lab document
 
-//            <-- End Speed Control -->
-//            <-- Wheel Speed Control from Lab4 -->
-            if(measured_heading ==  desired_heading) {
-                if(compass_speed >127){
-                    negative= compass_speed-256;
-                    printf("negative: %u\r\n", negative);
-                }else if(compass_speed < 127 ){
-                    negative=compass_speed;
-                    printf("negative: %u\r\n", negative);
-                }
-                if(negative > 0){
-                    printf("stright\r\n");
-                    GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN4);
-                    GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN5);
-                    Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, desired_speed_left);
-                   Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right);
-                }
-                if(negative < 0){
-                    printf("backwards\r\n");
-                    GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN4);
-                    GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN5);
-                    Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, desired_speed_left);
-                   Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right);
-                }
+                //Trigger the ADC to read both potentiometers
+                //ADC14_enableConversion();
+                m=(500-100)/(.9*8192);
+                speed_val = ADC14_getResult(ADC_MEM0);
+                dir_val = ADC14_getResult(ADC_MEM1);
+                ADC14_toggleConversionTrigger();
 
-            }else {
-                GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN4);
-                Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, (desired_speed_left+100.0));
-                GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN5);
-                Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right-100.0);
-            }
+                //Convert the speed potentiometer measurement to a desired speed
+                //desired_speed_left = 16384*((3.3 - 0.0)/(speed_val - 0.0));
+
+                //desired_speed_left = 16384*((speed_val - 0.0)/(3.3 - 0.0));
+
+                desired_speed_left = speed_val;
+                desired_speed_right = speed_val;
+                direct_val=dir_val;
+                printf("direct_val: %f\r\n", direct_val);
+                printf("desired speed: %f \r\n", speed_val);
+//              for left wheel
+                //speed
+              //  printf("begin desired speed:::::::: %f\r\n", desired_speed_left);
+               // printf("SPEED VAL:::::: %f\r\n", speed_val);
+                //Ensure the desired speed follows the control specifications below
+                //Convert the steering potentiometer measurement to a differential speed following the specifications below.
+                diff_speed_left = desired_speed_left*((0.5*149)/(149/2));
+               // printf("begin diff speed: %f\r\n", diff_speed_left);
+
+                min_diff_speed_left = .1*65535;
+               // printf("min_diff_speed: %f\r\n", min_diff_speed_left);
+                max_diff_speed_left = (desired_speed_left*0.5)*(149/(2*0.200));
+              //  printf("max diff speed: %f\r\n", max_diff_speed_left);
+
+                //for right wheel
+                //speed
+                //printf("begin desired speed:::::::: %f\r\n", desired_speed_right);
+              // printf("SPEED VAL:::::: %f\r\n", speed_val);
+               //Ensure the desired speed follows the control specifications below
+              // direc_val_right=16384*((3.3 - 0.0)/(dir_val - 0.0 ));
+               //printf("begin direction value: %f\r\n", direc_val_right);
+               //Convert the steering potentiometer measurement to a differential speed following the specifications below.
+               diff_speed_right = desired_speed_right*((0.5*149)/(149/2));
+              // printf("begin diff speed: %f\r\n", diff_speed_right);
+
+               min_diff_speed_right = .1*65535;
+             //  printf("min_diff_speed: %f\r\n", min_diff_speed_right);
+               max_diff_speed_right = (desired_speed_right*0.5)*(149/(2*0.200));
+              // printf("max diff speed: %f\r\n", max_diff_speed_right);
+
+                //<-- Start Wheel Speed Control -->
+                //For Each Wheel: left
+                    left_speed = desired_speed_left - diff_speed_left;
+
+                    if((fabs(desired_speed_left) > (.9*8192)) && (fabs(desired_speed_left) < (1.1*8192))) {
+                        if((fabs(direct_val) > (.33*8192)) && (fabs(direct_val) < (.66*8192))){
+                                desired_speed_left = 0.0;
+                             //  printf("left speed = 0: %f\r\n", desired_speed_left);
+                               Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, desired_speed_left);
+                               printf("STOPPPPPPPP left\r\n");
+                        }else if(direct_val < (.33*8192)){
+                            printf("left wheel, still, turning left\r\n");
+                            GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN4);
+                            Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, (desired_speed_left-100.0));
+                        }else if(direct_val > (.66*8192)){
+                            printf("left wheel, still, turning right\r\n");
+                            GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN4);
+                            Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, (desired_speed_left+100.0));
+                        }
+                    }else if(desired_speed_left < (.9*8192)){
+                        desired_speed_left=(m)*left_speed+200.0;
+                        GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN4);
+                        printf("left forwards\r\n");
+                        //printf("left speed < min: %f\r\n", desired_speed_left);
+                        //direction
+                           if((fabs(direct_val) > (.33*8192)) && (fabs(direct_val) < (.66*8192))){
+                               //straight
+                              printf("forward straight left\r\n");
+                              printf("desired_speed left forward %f\r\n", desired_speed_left);
+                               Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, desired_speed_left);
+                           }else if(direct_val < (.33*8192)) {
+                               //turning  left
+                               printf("forward left left\r\n");
+                               GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN4);
+                               Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, (desired_speed_left-100.0));
+                           }else if(direct_val > (.66*8192)){
+                               //turning right
+                               printf("forward right left\r\n");
+                               GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN4);
+                               Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, (desired_speed_left+100.0));
+                           }
+//                        Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, desired_speed_left);
+                       // printf("forwards\r\n");
+                    }else if(desired_speed_left > (1.1*8192)){
+                        desired_speed_left = ((-1)*(m))*(8192-(1.1*8192))+200.0;
+                       // printf("left speed > min: %f\r\n", desired_speed_left);
+                        GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN4);
+                        printf("backwards left\r\n");
+                        //direction
+                           if(direct_val > (.33*8192) && (direct_val < (.66*8192))){
+                               //straight
+                               printf("reverse straight left\r\n");
+                               printf("desired_speed left reverse %f\r\n", desired_speed_left);
+                               Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, desired_speed_left);
+                           }else if(direct_val < (.33*8192)) {
+                               //turning  left
+                               printf("reverse left left\r\n");
+                               GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN4);
+                               Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, (desired_speed_left-100.0));
+                           }else if(direct_val > (.66*8192)){
+                               //turning right
+                               printf("reverse right left\r\n");
+                               GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN4);
+                               Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, (desired_speed_left+100.0));
+                           }
+                   //     Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, desired_speed_left);
+                      //  printf("back\r\n");
+
+                    }
+                  // printf("TachL_count: %d\r\n", TachL_count);
+                   speed_error_left = 1500000.0/TachL_count;
+                  // printf("speed_error_left %f\r\n", speed_error_left);
+                   speed_error_leftsum += speed_error_left;
+                  // printf("speed error sum: %f\r\n", speed_error_leftsum);
+                   correct_speed_left=desired_speed_left + (ki*speed_error_leftsum);
+                  // printf("correct speed: %f\r\n", correct_speed_left);
+                   compare_value_left=speed_error_left*1000.0;
+                  // printf("compare value left: %f\r\n", compare_value_left);
+
+                   //<-- Start Wheel Speed Control -->
+                   //For Each Wheel: right
+                       right_speed = desired_speed_right - diff_speed_right;
+
+                       if((fabs(desired_speed_right) > (.9*8192)) && (fabs(desired_speed_right) < (1.1*8192))) {
+                           if((fabs(direct_val) > (.33*8192)) && (fabs(direct_val) < (.66*8192))){
+                                 desired_speed_right = 0.0;
+                              //  printf("left speed = 0: %f\r\n", desired_speed_left);
+                                Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right);
+                                printf("STOPPPPPPPP right\r\n");
+                           }else if(direct_val < (.33*8192)){
+                               printf("right wheel, still, turning left\r\n");
+                               GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN5);
+                               Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, (desired_speed_right+100.0));
+                           }else if(direct_val > (.66*8192)){
+                                   printf("right wheel, still, turning right\r\n");
+                                   GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN5);
+                                   Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right-100.0);
+                               }
+                       }else if(desired_speed_right < (.9*8192)){
+                           desired_speed_right=(m)*right_speed+200.0;
+                           GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN5);
+                           //printf("right speed < min: %f\r\n", desired_speed_right);
+                           printf("forward right\r\n");
+                           if((fabs(direct_val) > (.33*8192)) && (fabs(direct_val) < (.66*8192))){
+                                 //straight
+                               printf("forward straight right\r\n");
+                               printf("desired_speed right forward %f\r\n", desired_speed_right);
+                               Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right);
+                             }else if(direct_val < (.33*8192)) {
+                                 //turning  left
+                                 printf("forward left right\r\n");
+                                 GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN5);
+                                 Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, (desired_speed_right+100.0));
+                             }else if(direct_val > (.66*8192)){
+                                 //turning right
+                                 printf("forward right right\r\n");
+                                 GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN5);
+                                 Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, (desired_speed_right-100.0));
+                             }
+                           //Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right);
+                       }else if(desired_speed_right > (1.1*8192)){
+                           desired_speed_right =(-1*(m))*(8192-(1.1*8192))+200.0;
+                           //printf("right speed > min: %f\r\n", desired_speed_right);
+                           GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN5);
+                           printf("REVERSE right\r\n");
+                           if((fabs(direct_val) > (.33*8192)) && (fabs(direct_val) < (.66*8192))){
+                                //straigh
+                               printf("reverse Stright right\r\n");
+                               printf("desired_speed right reverse %f\r\n", desired_speed_right);
+                              Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right);
+                            }else if(direct_val < (.33*8192)) {
+                                //turning  left
+                                printf("reverse left right\r\n");
+                                GPIO_setOutputLowOnPin(GPIO_PORT_P5, GPIO_PIN5);
+                                Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, (desired_speed_right-100.0));
+                            }else if(direct_val > (.66*8192)){
+                                //turning right
+                                printf("reverse right right\r\n");
+                                GPIO_setOutputHighOnPin(GPIO_PORT_P5, GPIO_PIN5);
+                                Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, (desired_speed_right+100.0));
+                       }
+                          // Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right);
+                         //  printf("REVERSE\r\n");
+
+                       }
+                    //  printf("TachL_count: %d\r\n", TachR_count);
+                      speed_error_right = 1500000.0/TachR_count;
+                      //printf("speed_error_right %f\r\n", speed_error_right);
+                      speed_error_rightsum += speed_error_right;
+                   //   printf("speed error sum: %f\r\n", speed_error_rightsum);
+                      correct_speed_right=desired_speed_right + (ki*speed_error_rightsum);
+                 //     printf("correct speed: %f\r\n", correct_speed_right);
+                      compare_value_right=speed_error_right*1000.0;
+                   //   printf("compare value right: %f\r\n", compare_value_right);
+
         }
     }
+    }
 
+
+
+void ADCInit(){
+    // Add your ADC initialization code here.
+    //  Don't forget the GPIO, either here or in GPIOInit()!!
+    ADC14_enableModule();
+    ADC14_initModule(ADC_CLOCKSOURCE_SMCLK,ADC_PREDIVIDER_4 ,ADC_DIVIDER_1 , ADC_NOROUTE);
+    ADC14_setResolution(ADC_14BIT);
+    ADC14_configureConversionMemory(ADC_MEM0, ADC_VREFPOS_AVCC_VREFNEG_VSS, ADC_INPUT_A9, false); //4.4
+    ADC14_configureConversionMemory(ADC_MEM1, ADC_VREFPOS_AVCC_VREFNEG_VSS, ADC_INPUT_A12, false); //4.1
+    //ADC14_configureSingleSampleMode(ADC_MEM0, false);
+    ADC14_configureMultiSequenceMode(ADC_MEM0, ADC_MEM1, true);
+    ADC14_enableSampleTimer(ADC_AUTOMATIC_ITERATION);
+    ADC14_enableConversion();
 }
 
 void GPIOInit(){
@@ -214,24 +309,6 @@ void GPIOInit(){
 //    GPIO_setAsInputPin(GPIO_PORT_P4,GPIO_PIN1|GPIO_PIN4); //4.4 left (speed), 4.1 to right(steering)
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN4, GPIO_TERTIARY_MODULE_FUNCTION); //4.4 left (speed)
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P4, GPIO_PIN1, GPIO_TERTIARY_MODULE_FUNCTION); //4.1 to right (steering)
-
-    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN6, GPIO_SECONDARY_MODULE_FUNCTION);
-    GPIO_setAsPeripheralModuleFunctionOutputPin(GPIO_PORT_P6, GPIO_PIN7, GPIO_SECONDARY_MODULE_FUNCTION);
-
-    GPIO_setAsOutputPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
-    GPIO_setOutputLowOnPin(GPIO_PORT_P2,GPIO_PIN0|GPIO_PIN1|GPIO_PIN2);
-    GPIO_setAsOutputPin(GPIO_PORT_P1,GPIO_PIN0);
-    GPIO_setOutputLowOnPin(GPIO_PORT_P1,GPIO_PIN0);
-}
-
-void I2CInit(){
-    I2c.selectClockSource=EUSCI_B_I2C_CLOCKSOURCE_SMCLK;
-    I2c.i2cClk = 24000000;
-    I2c.dataRate = EUSCI_B_I2C_SET_DATA_RATE_100KBPS;
-    I2c.byteCounterThreshold=0;
-    I2c.autoSTOPGeneration=EUSCI_B_I2C_NO_AUTO_STOP;
-    I2C_initMaster(EUSCI_B3_BASE, &I2c);
-    I2C_enableModule(EUSCI_B3_BASE);
 
 }
 
@@ -284,7 +361,7 @@ void TimerInit(){
     TA2cfg.clockSource = TIMER_A_CLOCKSOURCE_SMCLK;
     TA2cfg.clockSourceDivider = TIMER_A_CLOCKSOURCE_DIVIDER_64;
     TA2cfg.timerInterruptEnable_TAIE = TIMER_A_TAIE_INTERRUPT_ENABLE;
-    TA2cfg.timerPeriod = 18749;
+    TA2cfg.timerPeriod = 37499;
     Timer_A_configureUpMode(TIMER_A2_BASE,&TA2cfg);
     Timer_A_registerInterrupt(TIMER_A2_BASE,TIMER_A_CCRX_AND_OVERFLOW_INTERRUPT,T2_100ms_ISR);
 
@@ -345,22 +422,3 @@ void T2_100ms_ISR(){
     Timer_A_clearInterruptFlag(TIMER_A2_BASE);
     runControl = 1;
 }
-
-uint16_t readonCarCompass(){
-//    Ensure a minimum 2-element uint8_t array exists
-//    use I2C_readData to fetch registers 2 and 3 at the same time
-    printf("starting to read car compass data \r\n");
-    I2C_readData(EUSCI_B3_BASE,0x60,2,compass,2);
-//    Combine the received bytes together to form the heading value
-      compassHeading = (compass[0]<<8) + (compass[1]) ;
-      //printf("compassheading: %u \r\n", compassHeading);
-      return compassHeading;
-}
-uint16_t readHandCompass(){
-    printf("starting to read hand compass data \r\n");
-//    I2C_readData(EUSCI_B3_BASE,0x63,4,handcompass,2);
-    I2C_readData(EUSCI_B3_BASE,0x63,2,handHeading,2);
-    handcomHeading = (handHeading[0]<<8) + (handHeading[1]) ;
-    return handcomHeading;
-}
-
