@@ -134,6 +134,7 @@ int main( void ) {    /** Main Function ****/
 //            printf("Compass on hand: %4u\r\n",handcompass[0]);
             printf("pitch value: %4d\r\n",hand_compass[0]);
             compass_speed=hand_compass[0];
+            compass_speed=0;
             measured_heading= compassHeading;
             printf("measured: %f \r\n", measured_heading);
             printf("desired: %f \r\n", desired_heading);
@@ -155,6 +156,7 @@ int main( void ) {    /** Main Function ****/
                 heading_error+=3600;
             }
             max_diff_speed = (kp*heading_error)+kd*(heading_error-(previous_error));
+            printf("diff speed %d\r\n", max_diff_speed);
             ///////////////// Limit |diff speed| to 10-50 % DC
 
 
@@ -187,7 +189,7 @@ int main( void ) {    /** Main Function ****/
                    if((fabs(desired_heading) < (.33*3600)) && (fabs(desired_heading) > (.66*3600))){
                        //straight
 //                      printf("forward straight left\r\n");
-                       Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, desired_speed_left);
+                       Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, 200);
                    }else if(desired_heading < (.33*3600)) {
                        //turning  left
 //                       printf("forward left left\r\n");
@@ -207,7 +209,7 @@ int main( void ) {    /** Main Function ****/
                    if(desired_heading > (.33*3600) && (desired_heading < (.66*3600))){
                        //straight
 //                       printf("reverse straight left\r\n");
-                       Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, desired_speed_left);
+                       Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_4, 200);
                    }else if(desired_heading > (.33*3600)) {
                        //turning  left
 //                       printf("reverse left left\r\n");
@@ -248,7 +250,7 @@ int main( void ) {    /** Main Function ****/
                    if((fabs(desired_heading) > (.33*3600)) && (fabs(desired_heading) < (.66*3600))){
                          //straight
 //                       printf("forward straight right\r\n");
-                       Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right);
+                       Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, 200);
                      }else if(desired_heading < (.33*3600)) {
                          //turning  left
 //                         printf("forward left right\r\n");
@@ -267,7 +269,7 @@ int main( void ) {    /** Main Function ****/
                    if((fabs(desired_heading) > (.33*3600)) && (fabs(desired_heading) < (.66*3600))){
                         //straigh
 //                       printf("reverse Stright right\r\n");
-                      Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, desired_speed_right);
+                      Timer_A_setCompareValue(TIMER_A0_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_3, 200);
                     }else if(desired_heading < (.33*3600)) {
                         //turning  left
 //                        printf("reverse left right\r\n");
